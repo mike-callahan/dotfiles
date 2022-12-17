@@ -1,7 +1,4 @@
 ### setup bash ###
-# https://github.com/mathiasbynens/dotfiles/blob/main/.bash_profile
-# Add `~/bin` to the `$PATH`
-export PATH="$HOME/bin:$PATH";
 
 # Load the shell dotfiles, and then some:
 # * ~/.path can be used to extend `$PATH`.
@@ -12,15 +9,6 @@ unset file;
 
 ### override bash defaults ###
 shopt -s cdspell;
-
-# Add tab completion for many Bash commands
-if which brew &> /dev/null && [ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ]; then
-	# Ensure existing Homebrew v1 completions continue to work
-	export BASH_COMPLETION_COMPAT_DIR="$(brew --prefix)/etc/bash_completion.d";
-	source "$(brew --prefix)/etc/profile.d/bash_completion.sh";
-elif [ -f /etc/bash_completion ]; then
-	source /etc/bash_completion;
-fi;
 
 #### bash history fix ###
 # https://unix.stackexchange.com/questions/1288/preserve-bash-history-in-multiple-terminal-windows
@@ -41,5 +29,3 @@ history() {                  #5
 }
 
 PROMPT_COMMAND=_bash_history_sync
-
-
