@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 # Shell prompt based on the Solarized Dark theme.
 # Screenshot: http://i.imgur.com/EkEtphC.png
 # Heavily inspired by @necolas’s prompt: https://github.com/necolas/dotfiles
@@ -111,37 +109,26 @@ PS1+="\$(prompt_git \"\[${white}\] on \[${violet}\]\" \"\[${blue}\]\")"; # Git r
 PS1+="\n";
 PS1+="\[${white}\]\$ \[${reset}\]"; # `$` (and reset color)
 
-externalip(){
-    # Avoid using dig as some suggest. Instead use HTTPS for privacy of request source
-    wget -qqO- 'https://duckduckgo.com/?q=what+is+my+ip' | grep -ow 'Your IP address is [0-9.]*[0-9]' | grep -ow '[0-9][0-9.]*'
+#### bash history fix ###
+# https://unix.stackexchange.com/questions/1288/preserve-bash-history-in-multiple-terminal-windows
+HISTSIZE=9000
+HISTFILESIZE=$HISTSIZE
+HISTCONTROL=ignorespace:ignoredups
+
+_bash_history_sync() {
+    builtin history -a         #1
+    HISTFILESIZE=$HISTSIZE     #2
+    builtin history -c         #3
+    builtin history -r         #4
 }
 
-# Found best way to enable right hand and left hand prompts
-# https://superuser.com/questions/187455/right-align-part-of-prompt/1203400#1203400
-_prompt_bash_set() {
-	# Pass printf to a shell variable for right hand side
-	printf -v PS1RHS "${reset}${bold}${orange}[ $(externalip) ]${reset}"
-
-	# Strip ANSI commands before counting length
-	# From: https://www.commandlinefu.com/commands/view/12043/remove-color-special-escape-ansi-codes-from-text-with-sed
-	PS1RHS_stripped=$(sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" <<<"$PS1RHS")
-
-	# Reference: https://en.wikipedia.org/wiki/ANSI_escape_code
-	local Save='\e[s' # Save cursor position
-	local Rest='\e[u' # Restore cursor to save point
-
-	# Save cursor position, jump to right hand edge, then go left N columns where
-	# N is the length of the printable RHS string. Print the RHS string, then
-	# return to the saved position and print the LHS prompt.
-
-	# Note: "\[" and "\]" are used so that bash can calculate the number of
-	# printed characters so that the prompt doesn't do strange things when
-	# editing the entered text.
-
-	PS1="\[${Save}\e[${COLUMNS:-$(tput cols)}C\e[${#PS1RHS_stripped}D${PS1RHS}${Rest}\]${PS1}"
+history() {                  #5
+    _bash_history_sync
+    builtin history "$@"
 }
 
-PROMPT_COMMAND='_prompt_bash_set'
+#PROMPT_COMMAND='_prompt_bash_set && _bash_history_sync'
+PROMPT_COMMAND='_bash_history_sync'
 export PROMPT_COMMAND;
 
 PS2="\[${yellow}\]→ \[${reset}\]";

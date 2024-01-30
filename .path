@@ -1,33 +1,33 @@
-#!/usr/bin/env bash
+# #!/usr/bin/env bash
 
-# https://github.com/mathiasbynens/dotfiles/blob/main/.bash_profile
-# Add `~/bin` to the `$PATH`
-export PATH="$HOME/bin:$PATH";
+# # https://github.com/mathiasbynens/dotfiles/blob/main/.bash_profile
+# # Add `~/bin` to the `$PATH`
+# export PATH="$HOME/bin:$PATH";
 
-# Platform specific paths
-case "$(uname -sr)" in
+# # Platform specific paths
+# case "$(uname -sr)" in
 
-   Darwin*)
-     echo 'MacOS'
-     export PATH=$PATH:/opt/homebrew/bin
-     ;;
+#    Darwin*)
+#      echo 'MacOS'
+#      export PATH=$PATH:/opt/homebrew/bin
+#      ;;
 
-   Linux*Microsoft*)
-     echo 'WSL'  # Windows Subsystem for Linux
-     ;;
+#    Linux*Microsoft*)
+#      echo 'WSL'  # Windows Subsystem for Linux
+#      ;;
 
-   Linux*)
-     echo 'Linux'
-     ;;
+#    Linux*)
+#      echo 'Linux'
+#      ;;
 
-   CYGWIN*|MINGW*|MINGW32*|MSYS*)
-     echo 'MS Windows'
-     ;;
+#    CYGWIN*|MINGW*|MINGW32*|MSYS*)
+#      echo 'MS Windows'
+#      ;;
 
-   # Add here more strings to compare
-   # See correspondence table at the bottom of this answer
+#    # Add here more strings to compare
+#    # See correspondence table at the bottom of this answer
 
-   *)
-     echo 'Other OS' 
-     ;;
-esac
+#    *)
+#      echo 'Other OS' 
+#      ;;
+# esac

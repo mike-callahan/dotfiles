@@ -1,6 +1,16 @@
-# Load the shell dotfiles, and then some:
-# * ~/.path can be used to extend `$PATH`.
-for file in ~/.shellconf.d/{path,bashrc,bash_prompt,exports,aliases,functions,profile}; do
-	[ -r "$file" ] && [ -f "$file" ] && source "$file";
-done;
-unset file;
+#!/usr/bin/env bash
+
+if test -f ~/.bashrc; then
+    mv ~/.bashrc ~/.bashrc.bak
+fi
+
+if test -f ~/.profile; then
+    mv ~/.profile ~/.profile.bak
+fi
+
+if test -f ~/.bash_profile; then
+    mv ~/.bash_profile ~/.bash_profile.bak
+fi
+
+ln -s ~/.config/dotfiles/.bash_profile ~/.bash_profile
+ln -s ~/.config/dotfiles/.bashrc ~/.bashrc
