@@ -1,3 +1,6 @@
+shopt -s checkwinsize
+shopt -s globstar
+
 source ~/.config/dotfiles/.aliases
 source ~/.config/dotfiles/.bash_prompt
 source ~/.config/dotfiles/.exports
