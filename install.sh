@@ -15,8 +15,6 @@ if ! test -f ~/.dotfilelock; then
 
     find ~/. -maxdepth 3 -type f -name ".*" -print0 | tar -cvf dotfiles.bak.tar --null -T -
 
-    rm -rf ~/.*
-
 fi
 
 myDotfilesFullPath=(~/.config/dotfiles/homedir/.*)
