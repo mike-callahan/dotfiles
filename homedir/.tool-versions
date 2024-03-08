@@ -1,0 +1,12 @@
+gcloud latest
+bazel latest
+bin latest
+direnv latest
+github-cli 2.45.0
+helm latest
+jq latest
+yj latest
+kubectl latest
+kubectx latest
+tfenv latest
+
