@@ -17,5 +17,13 @@ elif [ -f /etc/bash_completion ]; then
 	source /etc/bash_completion;
 fi;
 
-export GOPATH="$HOME/go"; export GOROOT="$HOME/.go"; export PATH="$GOPATH/bin:$PATH"; # g-install: do NOT edit, see https://github.com/stefanmaric/g
+# add tfenv to path
 export PATH="$HOME/.tfenv/bin:$PATH"
+
+# add pyenv to path
+export PYENV_ROOT="$HOME/.pyenv"
+command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+
+# add pyenv virtualenv to path
+eval "$(pyenv virtualenv-init -)"
