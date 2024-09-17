@@ -17,6 +17,10 @@ if ! test -f ~/.dotfilelock; then
 
 fi
 
+# reload fonts
+# fc-cache -fv
+# starship preset nerd-font-symbols -o ~/.config/starship.toml
+
 myDotfilesFullPath=(~/.config/dotfiles/homedir/.*)
 myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
 # for file in "${myDotfilesFullPath[@]}"; do
