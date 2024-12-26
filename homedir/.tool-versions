@@ -1,6 +1,6 @@
 gcloud latest
 bazel latest
-bin latest
+#bin latest
 direnv latest
 github-cli 2.45.0
 helm latest
