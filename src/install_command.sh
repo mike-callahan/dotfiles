@@ -1,19 +1,16 @@
-#!/usr/bin/env bash
-set -euo pipefail
-shopt -s dotglob
-shopt -s nullglob
+#echo "# this file is located in 'src/install_command.sh'"
+#echo "# code for 'dotfiles install' goes here"
+#echo "# you can edit it freely and regenerate (it will not be overwritten)"
+inspect_args
 
-# test for a lockfile
-echo Starting...
-
+platform=${args[--platform]}
 # init a new installation, backing up any current dotfiles
 if ! test -f ~/.dotfilelock; then
 
-    echo Backing up dotfiles
-
+    echo Backing up existing dotfiles
     touch ~/.dotfilelock
-
-    find ~/. -maxdepth 3 -type f -name ".*" -print0 | tar -cvf dotfiles.bak.tar --null -T -
+    printf -v date '%(%Y-%m-%d_%H%M%S)T' -1
+    find ~/. -maxdepth 3 -type f -name ".*" -print0 | tar -cvf "dotfiles.tar-$date" --null -T -
 
 fi
 
@@ -21,14 +18,9 @@ fi
 # fc-cache -fv
 # starship preset nerd-font-symbols -o ~/.config/starship.toml
 
-myDotfilesFullPath=(~/.config/dotfiles/homedir/.*)
+myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
 myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
-# for file in "${myDotfilesFullPath[@]}"; do
-#     myDotfilesShortPath+=( "${file##*/}" )
-#     #echo "$file"
-#     echo "${file}"
-# done
-# unset file
+
 echo "${myDotfilesShortPath[@]}"
 
 if test -f ~/.dotfilelock; then
@@ -38,12 +30,11 @@ if test -f ~/.dotfilelock; then
         if [ -L ~/$file ] ; then
             
             echo removing old symlink for "$file"
-
             rm ~/$file
         fi
 
         echo symlinking "$file"
-        ln -s ~/.config/dotfiles/homedir/$file ~/$file
+        ln -s ~/.config/dotfiles/$platform/homedir/$file ~/$file
 
     done
     unset file

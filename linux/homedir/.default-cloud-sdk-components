@@ -3,4 +3,4 @@ beta
 gsutil
 config-connector
 docker-credential-gcr
-cloud_sql_proxy
+cloud_sql_proxys

@@ -20,10 +20,4 @@ fi;
 # add tfenv to path
 export PATH="$HOME/.tfenv/bin:$PATH"
 
-# add pyenv to path
-export PYENV_ROOT="$HOME/.pyenv"
-command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init -)"
-
-# add pyenv virtualenv to path
-eval "$(pyenv virtualenv-init -)"
+export PATH="/opt/firefox:$PATH"
