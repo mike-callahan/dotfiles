@@ -18,7 +18,7 @@ fi
 # fc-cache -fv
 # starship preset nerd-font-symbols -o ~/.config/starship.toml
 
-myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
+( GLOBIGNORE=.:..; myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*) )
 myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
 
 echo "${myDotfilesShortPath[@]}"
