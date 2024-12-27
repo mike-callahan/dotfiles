@@ -5,6 +5,11 @@ source ~/.config/dotfiles/linux/bashconfig/.exports
 source ~/.config/dotfiles/linux/bashconfig/.functions
 source ~/.config/dotfiles/linux/bashconfig/.path
 
+# Only source bash_prompt if starship isn't installed
+if [ ! -f /usr/bin/starship ]; then
+	source ~/.config/dotfiles/linux/bashconfig/.bash_prompt
+fi
+
 # Add tab completion for many Bash commands
 if [ -f /etc/bash_completion ]; then
 	source /etc/bash_completion;
