@@ -17,10 +17,10 @@ fi
 # reload fonts
 # fc-cache -fv
 # starship preset nerd-font-symbols -o ~/.config/starship.toml
-
-( GLOBIGNORE=.:..; myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*) )
+GLOBIGNORE=.:..; 
+myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
 myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
-
+unset GLOBIGNORE
 echo "${myDotfilesShortPath[@]}"
 
 if test -f ~/.dotfilelock; then

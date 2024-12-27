@@ -219,10 +219,11 @@ dotfiles_install_command() {
   # reload fonts
   # fc-cache -fv
   # starship preset nerd-font-symbols -o ~/.config/starship.toml
+  GLOBIGNORE=.:..;
 
-  ( GLOBIGNORE=.:..; myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*) )
+  myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
   myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
-
+  unset GLOBIGNORE
   echo "${myDotfilesShortPath[@]}"
 
   if test -f ~/.dotfilelock; then
