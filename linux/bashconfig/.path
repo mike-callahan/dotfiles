@@ -1,33 +1,6 @@
-# #!/usr/bin/env bash
+### Use this dotfile to add items to PATH ###
 
-# # https://github.com/mathiasbynens/dotfiles/blob/main/.bash_profile
-# # Add `~/bin` to the `$PATH`
-# export PATH="$HOME/bin:$PATH";
-
-# # Platform specific paths
-# case "$(uname -sr)" in
-
-#    Darwin*)
-#      echo 'MacOS'
-#      export PATH=$PATH:/opt/homebrew/bin
-#      ;;
-
-#    Linux*Microsoft*)
-#      echo 'WSL'  # Windows Subsystem for Linux
-#      ;;
-
-#    Linux*)
-#      echo 'Linux'
-#      ;;
-
-#    CYGWIN*|MINGW*|MINGW32*|MSYS*)
-#      echo 'MS Windows'
-#      ;;
-
-#    # Add here more strings to compare
-#    # See correspondence table at the bottom of this answer
-
-#    *)
-#      echo 'Other OS' 
-#      ;;
-# esac
+# Source firefox manual installations
+# if [ -f "/opt/firefox" ]; then
+#     export PATH="/opt/firefox:$PATH"
+# fi

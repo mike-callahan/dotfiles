@@ -26,7 +26,7 @@ dotfiles_usage() {
   echo
   # :command.usage_commands
   printf "%s\n" "Commands:"
-  printf "  %s   Install dotfiles\n" "install  "
+  printf "  %s   install dotfiles\n" "install  "
   printf "  %s   backup any existing dotfiles to a tar.gz\n" "backup   "
   printf "  %s   uninstall a dotfiles-managed installation\n" "uninstall"
   echo
@@ -43,26 +43,12 @@ dotfiles_usage() {
     printf "    Show version number\n"
     echo
 
-    # :command.usage_environment_variables
-    printf "%s\n" "Environment Variables:"
-
-    # :environment_variable.usage
-    printf "  %s\n" "API_KEY"
-    printf "    Set your API key\n"
-    echo
-
-    # :command.usage_examples
-    printf "%s\n" "Examples:"
-    printf "  cli download example.com\n"
-    printf "  cli download example.com ./output -f\n"
-    echo
-
   fi
 }
 
 # :command.usage
 dotfiles_install_usage() {
-  printf "dotfiles install - Install dotfiles\n\n"
+  printf "dotfiles install - install dotfiles\n\n"
 
   printf "%s\n" "Usage:"
   printf "  dotfiles install [OPTIONS]\n"
@@ -114,13 +100,20 @@ dotfiles_uninstall_usage() {
   printf "dotfiles uninstall - uninstall a dotfiles-managed installation\n\n"
 
   printf "%s\n" "Usage:"
-  printf "  dotfiles uninstall\n"
+  printf "  dotfiles uninstall [OPTIONS]\n"
   printf "  dotfiles uninstall --help | -h\n"
   echo
 
   # :command.long_usage
   if [[ -n "$long_usage" ]]; then
     printf "%s\n" "Options:"
+
+    # :command.usage_flags
+    # :flag.usage
+    printf "  %s\n" "--platform PLATFORM (required)"
+    printf "    One of linux or macos.\n"
+    printf "    %s\n" "Allowed: linux, macos"
+    echo
 
     # :command.usage_fixed_flags
     printf "  %s\n" "--help, -h"
@@ -279,6 +272,33 @@ dotfiles_uninstall_command() {
   echo "# you can edit it freely and regenerate (it will not be overwritten)"
   inspect_args
 
+  platform=${args[--platform]}
+
+  myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
+  myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
+
+  echo "${myDotfilesShortPath[@]}"
+
+  if test -f ~/.dotfilelock; then
+
+      # Install/reinstall dotfiles
+      for file in "${myDotfilesShortPath[@]}"; do
+          if [ -L ~/$file ] ; then
+
+              echo removing old symlink for "$file"
+              rm ~/$file
+
+          fi
+      done
+
+      unset file
+
+  else
+      echo "Warning! No lockfile was found. Preventing accidental deletion"
+
+  fi
+
+  echo done!
 }
 
 # :command.parse_requirements
@@ -304,10 +324,6 @@ parse_requirements() {
 
     esac
   done
-
-  # :command.environment_variables_filter
-
-  env_var_names+=("API_KEY")
 
   # :command.command_filter
   action=${1:-}
@@ -513,6 +529,19 @@ dotfiles_uninstall_parse_requirements() {
   while [[ $# -gt 0 ]]; do
     key="$1"
     case "$key" in
+      # :flag.case
+      --platform)
+
+        # :flag.case_arg
+        if [[ -n ${2+x} ]]; then
+          args['--platform']="$2"
+          shift
+          shift
+        else
+          printf "%s\n" "--platform requires an argument: --platform PLATFORM" >&2
+          exit 1
+        fi
+        ;;
 
       -?*)
         printf "invalid option: %s\n" "$key" >&2
@@ -530,11 +559,23 @@ dotfiles_uninstall_parse_requirements() {
     esac
   done
 
+  # :command.required_flags_filter
+  if [[ -z ${args['--platform']+x} ]]; then
+    printf "missing required flag: --platform PLATFORM\n" >&2
+    exit 1
+  fi
+
+  # :command.whitelist_filter
+  if [[ ${args['--platform']:-} ]] && [[ ! ${args['--platform']:-} =~ ^(linux|macos)$ ]]; then
+    printf "%s\n" "--platform must be one of: linux, macos" >&2
+    exit 1
+  fi
+
 }
 
 # :command.initialize
 initialize() {
-  version="0.1.0"
+  version="0.2.0"
   long_usage=''
   set -e
 

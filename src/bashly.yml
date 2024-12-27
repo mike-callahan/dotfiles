@@ -1,14 +1,10 @@
 name: dotfiles
 help: dotfile manager created by Michael Callahan
-version: 0.1.0
-
-environment_variables:
-- name: api_key
-  help: Set your API key
+version: 0.2.0
 
 commands:
 - name: install
-  help: Install dotfiles
+  help: install dotfiles
   flags:
   - long: --platform
     arg: platform
@@ -21,10 +17,16 @@ commands:
 
 - name: uninstall
   help: uninstall a dotfiles-managed installation
+  flags:
+  - long: --platform
+    arg: platform
+    help: One of linux or macos.
+    allowed: [linux, macos]
+    required: true
 
-examples:
-- cli download example.com
-- cli download example.com ./output -f
+# examples:
+# - cli download example.com
+# - cli download example.com ./output -f
 
 # environment_variables:
 # - name: default_target_location

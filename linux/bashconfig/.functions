@@ -1,4 +1,12 @@
+### Use this dotfile to add custom shell functions ###
+
 whatismyip(){
-    # Avoid using dig as some suggest. Instead use HTTPS for privacy of request source
-    wget -qqO- 'https://duckduckgo.com/?q=what+is+my+ip' | grep -ow 'Your IP address is [0-9.]*[0-9]' | grep -ow '[0-9][0-9.]*'
+
+    if [ -f /usr/bin/wget ]; then
+	    # Avoid using dig as some suggest. Instead use HTTPS for privacy of request source
+        wget -qqO- 'https://duckduckgo.com/?q=what+is+my+ip' | grep -ow 'Your IP address is [0-9.]*[0-9]' | grep -ow '[0-9][0-9.]*';
+    else
+        echo "wget is not installed. Please install wget to use this function";
+    fi
+
 }

@@ -1,0 +1,11 @@
+### Use this dotfile to change shell options ###
+
+# Attempt auto-correct of mis-spelled directory names when using cd
+shopt -s cdspell;
+
+# Check for terminal window size changes and fix poor formatting
+shopt -s checkwinsize
+
+# Allows the use of ** pattern in pathname expansion
+# Matches all files and zero or more directories and subdirectories recursively
+shopt -s globstar
