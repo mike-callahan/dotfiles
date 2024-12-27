@@ -17,9 +17,16 @@ fi
 # reload fonts
 # fc-cache -fv
 # starship preset nerd-font-symbols -o ~/.config/starship.toml
+
+# prevent . and .. from being added to the array
 GLOBIGNORE=.:..; 
+
+# create an array with the full path to all dotfiles in the dotfile repo
 myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
+
+# get the filename of the dotfile to be used for symlinking
 myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
+
 unset GLOBIGNORE
 echo "${myDotfilesShortPath[@]}"
 
