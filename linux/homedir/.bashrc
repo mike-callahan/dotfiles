@@ -34,6 +34,8 @@ if [ -f /usr/bin/atuin ] || [ -f "$HOME/.atuin/bin/atuin" ]; then
 
 	if [ -f "$HOME/.atuin/bin/env" ]; then
 		. "$HOME/.atuin/bin/env"
+	else
+		export PATH="$HOME/.atuin/bin:$PATH"
 	fi
 
 	[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
