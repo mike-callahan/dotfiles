@@ -30,7 +30,7 @@ else
 fi
 
 # Load atuin
-if [ -f /usr/bin/atuin ]; then
+if [ -f /usr/bin/atuin ] || [ -f "$HOME/.atuin/bin/atuin" ]; then
 	. "$HOME/.atuin/bin/env"
 	[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
 	eval "$(atuin init bash --disable-up-arrow)";
