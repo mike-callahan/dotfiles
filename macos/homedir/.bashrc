@@ -5,14 +5,18 @@ source ~/.config/dotfiles/linux/bashconfig/.exports
 source ~/.config/dotfiles/linux/bashconfig/.functions
 source ~/.config/dotfiles/linux/bashconfig/.path
 
-# Only source bash_prompt if starship isn't installed
-if [ ! -f /usr/bin/starship ]; then
-	source ~/.config/dotfiles/linux/bashconfig/.bash_prompt
+if [ -d "/opt/homebrew" ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
 # Add tab completion for many Bash commands
 if [ -f /opt/homebrew/etc/bash_completion ]; then
 	source /opt/homebrew/etc/bash_completion;
+fi
+
+# Only source bash_prompt if starship isn't installed
+if [ ! -f /usr/bin/starship ]; then
+	source ~/.config/dotfiles/linux/bashconfig/.bash_prompt
 fi
 
 # Load mise
