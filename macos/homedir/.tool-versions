@@ -1,0 +1,16 @@
+gcloud     latest
+bazel      latest
+direnv     latest
+github-cli latest
+helm       latest
+jq         latest
+yj         latest
+kubectl    latest
+kubectx    latest
+tfenv      latest
+terraform  latest
+golang     latest
+packer     latest
+ruby       latest
+python     latest
+gh         latest
