@@ -19,13 +19,6 @@ if [ ! -f /usr/bin/starship ]; then
 	source ~/.config/dotfiles/linux/bashconfig/.bash_prompt
 fi
 
-# Load mise
-if [ -f /home/michael/.local/bin/mise ]; then
-	eval "$(/home/michael/.local/bin/mise activate bash)";
-else
-	echo Mise might not be installed
-fi
-
 # Load starship
 if [ -f /usr/bin/starship ]; then
 	eval "$(starship init bash)";
@@ -34,13 +27,7 @@ else
 fi
 
 # Load atuin
-if [ -f /usr/bin/atuin ] || [ -f "$HOME/.atuin/bin/atuin" ]; then
-
-	if [ -f "$HOME/.atuin/bin/env" ]; then
-		. "$HOME/.atuin/bin/env"
-	else
-		export PATH="$HOME/.atuin/bin:$PATH"
-	fi
+if [ -f /opt/homebrew/bin/atuin ]; then
 
 	[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
 	eval "$(atuin init bash --disable-up-arrow)";
