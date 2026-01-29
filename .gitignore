@@ -1,0 +1,10 @@
+# Secrets
+linux/bashconfig/.secrets
+
+# Environment / credentials
+.env
+.env.*
+*.local
+
+# Font cache
+linux/homedir/.fonts/.uuid

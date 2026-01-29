@@ -10,3 +10,77 @@ whatismyip(){
     fi
 
 }
+
+# USAGE
+
+#   safe_copy myscript.sh
+# # or to execute the commands:
+# eval "$(safe_copy myscript.sh)"
+safe_copy() {
+    local file="$1"
+
+    # Inner function to handle base64 encoding
+    get_base64_content() {
+        local input_file="$1"
+        base64 "$input_file"
+    }
+
+    local filename=$(basename "$file")
+
+    # Generate the commands
+    echo "cat << 'EOF' | base64 -d > '$filename'"
+    get_base64_content "$file"
+    echo "EOF"
+    echo "chmod +x '$filename'"
+}
+
+# download
+# ----------
+# Transfers a file from the remote machine to your local machine ("local-machine")
+# using an existing reverse SSH tunnel (assumes reverse tunnel on port 2222).
+#
+# Usage:
+#   download <remote_file_path> [optional_save_path_on_local-machine]
+#
+# Example:
+#   download /home/remoteuser/logs/output.txt
+#   download ./data.tar.gz /home/michael/backups
+#
+# Notes:
+# - This runs from the *remote* machine.
+# - Assumes reverse SSH tunnel is already active:
+#     ssh -N -R 2222:localhost:22 michael@remote_ip
+# - Files will be saved to /home/michael by default unless a custom path is provided.
+# - SSH key authentication is recommended for seamless use.
+download() {
+    local file_path="$1"
+    local save_path="${2:-/home/michael}"
+    local tunnel_port=2222
+    local local-machine_user="michael"
+    local local-machine_host="localhost"
+
+    # Validate input
+    if [[ -z "$file_path" ]]; then
+        echo "Usage: download <remote_file_path> [optional_save_path_on_local-machine]"
+        return 1
+    fi
+
+    # Check if reverse SSH tunnel is active
+    if ! nc -z "$local-machine_host" "$tunnel_port"; then
+        echo "❌ Reverse SSH tunnel on port $tunnel_port is NOT active."
+        echo "You need to run this on local-machine before using download:"
+        echo "    ssh -N -R 2222:localhost:22 ${REMOTE_USER}@${REMOTE_HOST}"
+        return 2
+    fi
+
+    # Execute scp via reverse tunnel
+    echo "📦 Sending '$file_path' to local-machine:$save_path ..."
+    scp -P "$tunnel_port" "$file_path" "${local-machine_user}@${local-machine_host}:${save_path}"
+
+    if [[ $? -eq 0 ]]; then
+        echo "✅ Successfully downloaded to local-machine:$save_path"
+    else
+        echo "❌ Failed to download. Double-check file paths and SSH access."
+        return 3
+    fi
+}

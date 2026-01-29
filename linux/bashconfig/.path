@@ -4,3 +4,9 @@
 # if [ -f "/opt/firefox" ]; then
 #     export PATH="/opt/firefox:$PATH"
 # fi
+#
+export PATH=$PATH:/nix/var/nix/profiles/default/bin/
+export PATH=$PATH:/home/michael/.nix-profile/bin
+export PATH="$PATH:/home/michael/.local/bin"
+export PATH="$PATH:/appimages"
+export PATH="$PATH:/appimages/gamescope"
