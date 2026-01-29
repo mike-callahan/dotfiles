@@ -1,5 +1,6 @@
 # Secrets
 linux/bashconfig/.secrets
+linux/bashconfig/.inject_secrets
 
 # Environment / credentials
 .env
