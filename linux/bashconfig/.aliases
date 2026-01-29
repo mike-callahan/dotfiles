@@ -21,4 +21,8 @@ alias egrep='egrep --color=auto'
 # Print each PATH entry on a separate line
 alias path='echo -e ${PATH//:/\\n}'
 
+# Show whitespace characters
 alias whitespace="sed 's/ /·/g;s/\t/￫/g;s/\r/§/g;s/$/¶/g'"
+
+# Use Rsync to copy
+alias rcp="rsync -HAXhaxvPS --numeric-ids --stats"

@@ -10,3 +10,4 @@ export PATH=$PATH:/home/michael/.nix-profile/bin
 export PATH="$PATH:/home/michael/.local/bin"
 export PATH="$PATH:/appimages"
 export PATH="$PATH:/appimages/gamescope"
+export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"

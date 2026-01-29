@@ -1,6 +1,6 @@
 alpha
 beta
 gsutil
-config-connector
-docker-credential-gcr
-gke-gcloud-auth-plugin
+#config-connector
+#docker-credential-gcr
+#gke-gcloud-auth-plugin
