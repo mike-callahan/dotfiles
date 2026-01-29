@@ -1,0 +1,2 @@
+### Use this dotfile to add items to PATH ###
+export PATH="$PATH:/opt/homebrew/bin"
