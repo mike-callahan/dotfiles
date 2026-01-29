@@ -1,9 +1,9 @@
 ### Use this dotfile to source other dotfiles or activate shell support for binaries ###
 
-source ~/.config/dotfiles/linux/bashconfig/.aliases
-source ~/.config/dotfiles/linux/bashconfig/.exports
-source ~/.config/dotfiles/linux/bashconfig/.functions
-source ~/.config/dotfiles/linux/bashconfig/.path
+source ~/.config/dotfiles/macos/bashconfig/.aliases
+source ~/.config/dotfiles/macos/bashconfig/.exports
+source ~/.config/dotfiles/macos/bashconfig/.functions
+source ~/.config/dotfiles/macos/bashconfig/.path
 
 if [ -d "/opt/homebrew" ]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
