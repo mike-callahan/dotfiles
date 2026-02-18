@@ -1,7 +1,7 @@
 # Clone using worktrees
 # Credit https://gabri.me/blog/git-worktrees-done-right
 gclone() {
-  local usage="Usage: gwt-clone <repo-url> [project-name] [branch...]"
+  local usage="Usage: gclone <repo-url> [project-name] [branch...]"
 
   # Args
   local repo_url="${1:?$usage}"
