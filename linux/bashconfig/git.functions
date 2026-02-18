@@ -1,0 +1,312 @@
+# Switch the 'origin' remote URL between SSH and HTTPS formats while preserving host and path.
+# Verifies access to the remote after switching and provides feedback.
+git-switch-origin() {
+  (
+    set -euo pipefail
+
+    # usage info
+    if [[ $# -ne 1 || ( "$1" != "--ssh" && "$1" != "--https" ) ]]; then
+      echo "Usage: git-switch-origin --ssh | --https" >&2
+      return 1
+    fi
+
+    local TARGET="${1#--}"
+    local REMOTE="origin"
+
+    # confirm repo
+    git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ Not a git repo."; return 1; }
+
+    # get current URL
+    local CUR_URL
+    CUR_URL=$(git remote get-url "$REMOTE" 2>/dev/null || true)
+    [[ -z "$CUR_URL" ]] && { echo "❌ Remote '$REMOTE' not found."; return 1; }
+
+    # parse host + path
+    local host path
+    if [[ "$CUR_URL" =~ ^git@([^:]+):(.+)$ ]]; then
+      host="${BASH_REMATCH[1]}"
+      path="${BASH_REMATCH[2]}"
+    elif [[ "$CUR_URL" =~ ^https?://([^/]+)/(.+)$ ]]; then
+      host="${BASH_REMATCH[1]}"
+      path="${BASH_REMATCH[2]}"
+    else
+      echo "❌ Unsupported remote URL format: $CUR_URL" >&2
+      return 1
+    fi
+    path="${path%.git}"
+
+    # build new URL
+    local NEW_URL
+    if [[ "$TARGET" == "https" ]]; then
+      NEW_URL="https://${host}/${path}.git"
+    else
+      NEW_URL="git@${host}:${path}.git"
+    fi
+
+    echo "➡️ Switching '$REMOTE' from:"
+    echo "   $CUR_URL"
+    echo "   → $NEW_URL"
+    git remote set-url "$REMOTE" "$NEW_URL"
+
+    # verify access
+    echo "🔎 Verifying access..."
+    if git ls-remote "$REMOTE" HEAD >/dev/null 2>&1; then
+      echo "✅ Verified: able to access $REMOTE via $TARGET."
+    else
+      echo "❌ Verification failed."
+      if [[ "$TARGET" == "ssh" ]]; then
+        echo "   → Check your SSH key + org SSO authorization." >&2
+      else
+        echo "   → Run 'gh auth setup-git' to configure HTTPS token." >&2
+      fi
+      return 2
+    fi
+
+    echo "✨ Done."
+  )
+}
+
+
+git-save() { (
+
+  # NOTE
+  # Snapshots record submodules as gitlinks to their current commits (not the submodules’ working trees)
+  # LFS objects are just regular blobs unless they’ve been committed as LFS pointers (untracked/unstaged big files will upload as full blobs)
+
+  # Safe options scoped to subshell
+  set -e
+  set -u
+  set -o pipefail 2>/dev/null || true
+
+  # Configuration (add flags later if you want)
+  REMOTE="origin"
+  SNAPSHOT_BRANCH="snapshot/${USER:-dev}"
+  INCLUDE_IGNORED="false"
+  MESSAGE="Snapshot of working tree"
+  QUIET="false"
+  URL_FORMAT="https"  # Options: "https" or "ssh"
+
+  # ============================================================================
+  # Core Functions
+  # ============================================================================
+
+  get_repo_context() {
+    # Gathers essential repository metadata and validates we're in a git repo.
+    # Sets global variables for repo name, current branch, HEAD commit, hostname,
+    # and timestamp. Also changes to the repository root directory.
+    git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ Not a git repo."; exit 1; }
+
+    TOP=$(git rev-parse --show-toplevel)
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "DETACHED")
+    PARENT_COMMIT=$(git rev-parse -q --verify HEAD 2>/dev/null || true)
+    REPO_NAME=$(basename "$TOP")
+    HOST=$(hostname -s 2>/dev/null || echo "host")
+    TS=$(date -u +%Y%m%dT%H%M%SZ)
+
+    cd "$TOP"
+  }
+
+  fetch_previous_snapshot_oid() {
+    # Fetches the remote snapshot branch into a temporary ref to get its commit ID.
+    # Uses a temp ref to avoid polluting the local branch namespace. Returns the
+    # commit SHA if it exists, or empty string if this is the first snapshot.
+    local snap_ref="refs/heads/${SNAPSHOT_BRANCH}"
+    local tmp_ref="refs/tmp/git-save-snap-$$-$(date +%s%N)"
+
+    # Clean in case a previous run died mid-flight
+    git update-ref -d "$tmp_ref" >/dev/null 2>&1 || true
+
+    # Fetch remote tip into our unique temp ref
+    git fetch --no-tags "$REMOTE" "+${snap_ref}:${tmp_ref}" >/dev/null 2>&1 || true
+
+    if git show-ref --verify --quiet "$tmp_ref"; then
+      git rev-parse "$tmp_ref"
+    else
+      echo ""
+    fi
+
+    # 🔹 This is the “delete temp ref” bit: remove the throwaway ref we just created.
+    git update-ref -d "$tmp_ref" >/dev/null 2>&1 || true
+  }
+
+  build_snapshot_tree() {
+    # Creates a git tree object from the current working directory using a temporary index.
+    # Seeds the temp index from HEAD (helps with sparse checkouts), then adds all working
+    # tree files. Returns the tree SHA. This is the core magic that snapshots your work
+    # without touching your actual staging area.
+    local tmp_index
+    tmp_index="$(mktemp "${TMPDIR:-/tmp}/git-index.XXXXXX")"
+    trap 'rm -f "${tmp_index-}"' EXIT
+    export GIT_INDEX_FILE="$tmp_index"
+
+    # Seed from HEAD if it exists (helps sparse/unborn)
+    [[ -n "${PARENT_COMMIT:-}" ]] && git read-tree "$PARENT_COMMIT"
+
+    # Add working tree
+    if [[ "$INCLUDE_IGNORED" == "true" ]]; then
+      git add -A -f .
+    else
+      git add -A .
+    fi
+
+    # Write tree (loud failure)
+    local tree_id
+    if ! tree_id=$(git write-tree 2>._git_save_write_tree_err); then
+      echo "❌ git write-tree failed:" >&2
+      sed -n '1,120p' ._git_save_write_tree_err >&2 || true
+      rm -f ._git_save_write_tree_err
+      exit 1
+    fi
+    rm -f ._git_save_write_tree_err
+
+    if [[ -z "$tree_id" ]]; then
+      echo "❌ Empty tree generated. Debug (temp index):" >&2
+      git ls-files --stage >&2 || true
+      exit 1
+    fi
+    echo "$tree_id"
+  }
+
+  create_snapshot_commit() {
+    # Creates a commit from the given tree with two parents (when possible):
+    # Parent 1: previous snapshot (enables fast-forward pushes)
+    # Parent 2: current HEAD (shows provenance - what your code was based on)
+    # Returns the new commit SHA.
+    local tree_id="$1"
+    local prev_snapshot="$2"
+
+    local commit_msg="$MESSAGE
+
+Repo: $REPO_NAME
+When: $TS (UTC)
+Host: $HOST
+From branch: $CURRENT_BRANCH
+Parent (HEAD): ${PARENT_COMMIT:-<none>}
+Snapshot branch: $SNAPSHOT_BRANCH
+Includes: working tree (untracked included$([[ "$INCLUDE_IGNORED" == "true" ]] && echo ", ignored included"))"
+
+    # Parents: prev snapshot (for FF), then HEAD (provenance)
+    local parents=()
+    [[ -n "$prev_snapshot"     ]] && parents+=(-p "$prev_snapshot")
+    [[ -n "${PARENT_COMMIT:-}" ]] && parents+=(-p "$PARENT_COMMIT")
+
+    if [[ ${#parents[@]} -eq 0 ]]; then
+      printf "%s\n" "$commit_msg" | git commit-tree "$tree_id"
+    else
+      printf "%s\n" "$commit_msg" | git commit-tree "$tree_id" "${parents[@]}"
+    fi
+  }
+
+  update_local_ref() {
+    # Updates the local snapshot branch ref to point to the new commit.
+    # Uses update-ref with the *current local* value for atomic compare-and-swap safety.
+    # This moves the branch pointer without doing a checkout.
+    local new_commit="$1"
+    local _prev_snapshot_ignored="$2"  # kept for compatibility with call sites
+    local snap_ref="refs/heads/${SNAPSHOT_BRANCH}"
+
+    local cur_local
+    cur_local=$(git rev-parse -q --verify "$snap_ref" 2>/dev/null || true)
+
+    if [[ -n "$cur_local" ]]; then
+      git update-ref "$snap_ref" "$new_commit" "$cur_local"
+    else
+      git update-ref "$snap_ref" "$new_commit"
+    fi
+  }
+
+  push_snapshot() {
+    # Pushes the *commit SHA* to the remote branch; remote moves only if push succeeds.
+    local q=()
+    [[ "$QUIET" == "true" ]] && q+=(--quiet)
+
+    local ref="refs/heads/${SNAPSHOT_BRANCH}"
+
+    if ! git ls-remote --exit-code "$REMOTE" "$ref" >/dev/null 2>&1; then
+      git push "${q[@]}" -u "$REMOTE" "${NEW_COMMIT}:${ref}"
+    else
+      git push "${q[@]}" "$REMOTE" "${NEW_COMMIT}:${ref}"
+    fi
+  }
+
+  build_commit_url() {
+    # Constructs a web-friendly URL pointing to the commit on the remote host.
+    # Normalizes URLs based on URL_FORMAT setting (https or ssh).
+    # For https: converts SSH URLs (git@github.com:user/repo) to HTTPS format
+    # For ssh: converts HTTPS URLs to SSH format (git@github.com:user/repo.git)
+    # Strips/adds .git extensions as appropriate.
+    local commit="$1"
+    local remote_url
+    remote_url=$(git remote get-url "$REMOTE")
+    
+    if [[ "$URL_FORMAT" == "ssh" ]]; then
+      # Convert HTTPS to SSH if needed
+      if [[ "$remote_url" =~ ^https://([^/]+)/(.+)$ ]]; then
+        local host="${BASH_REMATCH[1]}"
+        local path="${BASH_REMATCH[2]}"
+        # Strip .git if present, we'll add it back
+        path="${path%.git}"
+        echo "git@${host}:${path}.git#${commit}"
+      elif [[ "$remote_url" =~ ^git@([^:]+):(.+)$ ]]; then
+        # Already SSH format
+        local path="${BASH_REMATCH[2]}"
+        path="${path%.git}"
+        echo "${remote_url%.git}.git#${commit}"
+      else
+        # Fallback
+        echo "${remote_url}#${commit}"
+      fi
+    else
+      # Convert to HTTPS (default)
+      remote_url="${remote_url%.git}"
+      if [[ "$remote_url" =~ ^git@([^:]+):(.+)$ ]]; then
+        remote_url="https://${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+      fi
+      echo "${remote_url}/commit/${commit}"
+    fi
+  }
+
+  # ============================================================================
+  # Main Flow
+  # ============================================================================
+
+  get_repo_context
+
+  max_tries=3
+  try=1
+  while (( try <= max_tries )); do
+    PREV_SNAPSHOT=$(fetch_previous_snapshot_oid)
+    TREE_ID=$(build_snapshot_tree)
+    NEW_COMMIT=$(create_snapshot_commit "$TREE_ID" "$PREV_SNAPSHOT")
+
+    # Push first; if rejected or network/auth fails, do not advance local.
+    if push_snapshot; then
+      # Now move local ref with CAS versus current local tip.
+      if update_local_ref "$NEW_COMMIT" "$PREV_SNAPSHOT"; then
+        COMMIT_URL=$(build_commit_url "$NEW_COMMIT")
+
+        if [[ "$QUIET" == "false" ]]; then
+          echo "✅ Snapshot pushed!"
+          echo "   Branch: ${SNAPSHOT_BRANCH}"
+          echo "   Commit: ${NEW_COMMIT}"
+          echo "   Remote: ${REMOTE}"
+          echo "   URL: ${COMMIT_URL}"
+        fi
+        echo "$COMMIT_URL"
+        exit 0
+      else
+        echo "⚠️  Local snapshot ref moved; retrying ($try/$max_tries)..." >&2
+      fi
+    else
+      echo "⚠️  Push rejected/failed; will refetch and retry ($try/$max_tries)..." >&2
+    fi
+
+    # brief jitter to de-sync racers
+    sleep 0.$(( (RANDOM % 7) + 3 ))
+    (( try++ ))
+  done
+
+  echo "❌ Gave up after $max_tries attempts; snapshot branch kept moving or push kept failing." >&2
+  exit 1
+); }
+

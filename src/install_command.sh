@@ -14,37 +14,35 @@ if ! test -f ~/.dotfilelock; then
 
 fi
 
-# reload fonts
-# fc-cache -fv
-# starship preset nerd-font-symbols -o ~/.config/starship.toml
-
-# prevent . and .. from being added to the array
-GLOBIGNORE=.:..; 
-
-# create an array with the full path to all dotfiles in the dotfile repo
-myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
-
-# get the filename of the dotfile to be used for symlinking
-myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
-
-unset GLOBIGNORE
-echo "${myDotfilesShortPath[@]}"
+homedir=~/.config/dotfiles/$platform/homedir
 
 if test -f ~/.dotfilelock; then
 
-    # Install/reinstall dotfiles
-    for file in "${myDotfilesShortPath[@]}"; do
-        if [ -L ~/$file ] ; then
-            
-            echo removing old symlink for "$file"
-            rm ~/$file
+    # Recursively symlink individual files from homedir
+    while IFS= read -r -d '' file; do
+        # Get the path relative to homedir (e.g. .fonts/SomeFont.ttf, .local/bin/tjobs)
+        relpath="${file#$homedir/}"
+
+        # Create the parent directory in ~ if it doesn't exist
+        mkdir -p ~/$(dirname "$relpath")
+
+        # Remove old symlink if present
+        if [ -L ~/"$relpath" ]; then
+            echo "removing old symlink for $relpath"
+            rm ~/"$relpath"
         fi
 
-        echo symlinking "$file"
-        ln -s ~/.config/dotfiles/$platform/homedir/$file ~/$file
+        echo "symlinking $relpath"
+        ln -s "$file" ~/"$relpath"
 
-    done
-    unset file
+    done < <(find "$homedir" -type f -print0)
+
+    # Rebuild font cache if .fonts were installed
+    if [ -d "$homedir/.fonts" ]; then
+        echo "rebuilding font cache"
+        fc-cache -fv
+    fi
+
 fi
 
 echo done!

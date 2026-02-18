@@ -5,24 +5,20 @@ inspect_args
 
 platform=${args[--platform]}
 
-myDotfilesFullPath=(~/.config/dotfiles/$platform/homedir/.*)
-myDotfilesShortPath=( "${myDotfilesFullPath[@]##*/}" )
-
-echo "${myDotfilesShortPath[@]}"
+homedir=~/.config/dotfiles/$platform/homedir
 
 if test -f ~/.dotfilelock; then
 
-    # Install/reinstall dotfiles
-    for file in "${myDotfilesShortPath[@]}"; do
-        if [ -L ~/$file ] ; then
-            
-            echo removing old symlink for "$file"
-            rm ~/$file
+    # Remove symlinks for all managed files
+    while IFS= read -r -d '' file; do
+        relpath="${file#$homedir/}"
 
+        if [ -L ~/"$relpath" ]; then
+            echo "removing symlink for $relpath"
+            rm ~/"$relpath"
         fi
-    done
 
-    unset file
+    done < <(find "$homedir" -type f -print0)
 
 else
     echo "Warning! No lockfile was found. Preventing accidental deletion"

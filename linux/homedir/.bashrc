@@ -11,6 +11,7 @@ fi
 source ~/.config/dotfiles/linux/bashconfig/.aliases
 source ~/.config/dotfiles/linux/bashconfig/.exports
 source ~/.config/dotfiles/linux/bashconfig/.functions
+source ~/.config/dotfiles/linux/bashconfig/git.functions
 source ~/.config/dotfiles/linux/bashconfig/.path
 
 # Only source bash_prompt if starship isn't installed
