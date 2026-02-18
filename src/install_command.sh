@@ -30,6 +30,14 @@ if test -f ~/.dotfilelock; then
         if [ -L ~/"$relpath" ]; then
             echo "removing old symlink for $relpath"
             rm ~/"$relpath"
+        elif [ -e ~/"$relpath" ]; then
+            if [[ ${args[--skip-existing]} ]]; then
+                echo "skipping existing file: $relpath"
+                continue
+            else
+                echo "error: file already exists: ~/$relpath (use --skip-existing to skip)"
+                exit 1
+            fi
         fi
 
         echo "symlinking $relpath"

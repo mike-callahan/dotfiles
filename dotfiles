@@ -68,6 +68,11 @@ dotfiles_install_usage() {
     printf "    %s\n" "Allowed: linux, macos"
     echo
 
+    # :flag.usage
+    printf "  %s\n" "--skip-existing, -s"
+    printf "    Skip files that already exist instead of erroring out.\n"
+    echo
+
     # :command.usage_fixed_flags
     printf "  %s\n" "--help, -h"
     printf "    Show this help\n"
@@ -229,6 +234,14 @@ dotfiles_install_command() {
           if [ -L ~/"$relpath" ]; then
               echo "removing old symlink for $relpath"
               rm ~/"$relpath"
+          elif [ -e ~/"$relpath" ]; then
+              if [[ ${args[--skip-existing]} ]]; then
+                  echo "skipping existing file: $relpath"
+                  continue
+              else
+                  echo "error: file already exists: ~/$relpath (use --skip-existing to skip)"
+                  exit 1
+              fi
           fi
 
           echo "symlinking $relpath"
@@ -428,6 +441,14 @@ dotfiles_install_parse_requirements() {
           printf "%s\n" "--platform requires an argument: --platform PLATFORM" >&2
           exit 1
         fi
+        ;;
+
+      # :flag.case
+      --skip-existing | -s)
+
+        # :flag.case_no_arg
+        args['--skip-existing']=1
+        shift
         ;;
 
       -?*)

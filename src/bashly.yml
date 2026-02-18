@@ -11,6 +11,9 @@ commands:
     help: One of linux or macos.
     allowed: [linux, macos]
     required: true
+  - long: --skip-existing
+    short: -s
+    help: Skip files that already exist instead of erroring out.
 
 - name: backup
   help: backup any existing dotfiles to a tar.gz
