@@ -1,3 +1,56 @@
+# Clone using worktrees
+# Credit https://gabri.me/blog/git-worktrees-done-right
+gwt-clone() {
+  local usage="Usage: gwt-clone <repo-url> [project-name] [branch...]"
+
+  # Args
+  local repo_url="${1:?$usage}"
+  local project_name="${2:-$(basename "$repo_url" .git)}"
+  shift 2 2>/dev/null || shift 1
+
+  # Create project dir and bare clone
+  mkdir -p "$project_name" && cd "$project_name" || return 1
+  echo "📦 Cloning bare repo into $project_name..."
+  git clone --bare "$repo_url" .bare || return 1
+
+  # Magic .git file + config
+  echo "gitdir: ./.bare" > .git
+  git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+  git config worktree.useRelativePaths true
+
+  echo "🔄 Fetching all branches..."
+  git fetch --all --quiet
+
+  # Default branch detection
+  local default_branch
+  default_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|origin/||')
+  default_branch="${default_branch:-main}"
+
+  # Add default branch worktree first
+  echo "🌿 Adding worktree for default branch: $default_branch"
+  git worktree add "$default_branch" "$default_branch" 2>/dev/null || \
+  git worktree add "$default_branch" "origin/$default_branch"
+
+  # Add any extra branches passed as args
+  for branch in "$@"; do
+    if [ "$branch" != "$default_branch" ]; then
+      echo "🌿 Adding worktree for: $branch"
+      git worktree add "$branch" "$branch" 2>/dev/null || \
+      git worktree add "$branch" "origin/$branch"
+    fi
+  done
+
+  echo "✅ Done! Structure:"
+  ls -1
+}
+
+gswitch() {
+  local branch="${1:?Usage: gswitch <branch-name> [start-point]}"
+  local start="${2:-HEAD}"
+  git worktree add "$branch" -b "$branch" "$start" 2>/dev/null || \
+  git worktree add "$branch" "$branch"
+}
+
 # Switch the 'origin' remote URL between SSH and HTTPS formats while preserving host and path.
 # Verifies access to the remote after switching and provides feedback.
 git-switch-origin() {
