@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Example
+# ./script.sh -c "echo prefix-" file1 file2 file3
+# ./script.sh -c "echo 'processing {} now'" file1 file2 file3
+# ./script.sh -c "{} | grep pattern" file1 file2 file3
+# ./script.sh -c "cp {} backup_{}" file1 file2 file3
+
+# Define your command here with {} as placeholder for the argument
+COMMAND="echo 'processing file: {}'"  # Replace with your desired command format
+
+# Default items if using internal list
+DEFAULT_ITEMS=("item1" "item2" "item3" "item4")
+
+
+# Function to show usage
+usage() {
+    echo "Usage: $0 [-c command] [item1 item2 ...] OR"
+    echo "       $0 [-c command] -f (to read items from script)"
+    echo "Example: $0 -c 'ls {}' item1 item2 item3"
+    echo "Note: Use {} in your command to specify where the argument should be placed"
+    exit 1
+}
+
+# Parse command line options
+while getopts "c:fh" opt; do
+    case $opt in
+        c) COMMAND="$OPTARG";;
+        f) USE_DEFAULT=true;;
+        h) usage;;
+        \?) usage;;
+    esac
+done
+
+# Shift past the options
+shift $((OPTIND-1))
+
+# Get items either from command line or default list
+if [ "$USE_DEFAULT" = true ]; then
+    ITEMS=("${DEFAULT_ITEMS[@]}")
+else
+    if [ $# -eq 0 ]; then
+        echo "Error: No items provided"
+        usage
+    fi
+    ITEMS=("$@")
+fi
+
+# Get the number of items for parallel processing
+PARALLEL_COUNT=${#ITEMS[@]}
+
+# Run commands in parallel, replacing {} with the actual argument
+printf "%s\n" "${ITEMS[@]}" | xargs -P "$PARALLEL_COUNT" -I {} bash -c "${COMMAND}"
+
+# Wait for all processes to complete
+wait
+
