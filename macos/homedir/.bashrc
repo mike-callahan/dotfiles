@@ -1,8 +1,17 @@
 ### Use this dotfile to source other dotfiles or activate shell support for binaries ###
 
+# for non-interactive sessions stop execution here -- https://serverfault.com/a/805532/67528
+[[ $- != *i* ]] && return
+
+# Source secrets (gitignored) before other configs that may reference them
+if [ -f ~/.config/dotfiles/macos/bashconfig/.secrets ]; then
+	source ~/.config/dotfiles/macos/bashconfig/.secrets
+fi
+
 source ~/.config/dotfiles/macos/bashconfig/.aliases
 source ~/.config/dotfiles/macos/bashconfig/.exports
 source ~/.config/dotfiles/macos/bashconfig/.functions
+source ~/.config/dotfiles/macos/bashconfig/git.functions
 source ~/.config/dotfiles/macos/bashconfig/.path
 
 if [ -d "/opt/homebrew" ]; then
@@ -15,12 +24,19 @@ if [ -f /opt/homebrew/etc/bash_completion ]; then
 fi
 
 # Only source bash_prompt if starship isn't installed
-if [ ! -f /usr/bin/starship ]; then
-	source ~/.config/dotfiles/linux/bashconfig/.bash_prompt
+if [ ! -f /opt/homebrew/bin/starship ]; then
+	source ~/.config/dotfiles/macos/bashconfig/.bash_prompt
+fi
+
+# Load mise
+if [ -f /opt/homebrew/bin/mise ]; then
+    eval "$(/opt/homebrew/bin/mise activate bash)";
+else
+    echo Mise might not be installed
 fi
 
 # Load starship
-if [ -f /usr/bin/starship ]; then
+if [ -f /opt/homebrew/bin/starship ]; then
 	eval "$(starship init bash)";
 else
 	echo Starship might not be installed

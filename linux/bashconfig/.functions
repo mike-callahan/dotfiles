@@ -55,29 +55,29 @@ download() {
     local file_path="$1"
     local save_path="${2:-/home/michael}"
     local tunnel_port=2222
-    local local-machine_user="michael"
-    local local-machine_host="localhost"
+    local local_machine_user="michael"
+    local local_machine_host="localhost"
 
     # Validate input
     if [[ -z "$file_path" ]]; then
-        echo "Usage: download <remote_file_path> [optional_save_path_on_local-machine]"
+        echo "Usage: download <remote_file_path> [optional_save_path_on_local_machine]"
         return 1
     fi
 
     # Check if reverse SSH tunnel is active
-    if ! nc -z "$local-machine_host" "$tunnel_port"; then
+    if ! nc -z "$local_machine_host" "$tunnel_port"; then
         echo "❌ Reverse SSH tunnel on port $tunnel_port is NOT active."
-        echo "You need to run this on local-machine before using download:"
+        echo "You need to run this on the local machine before using download:"
         echo "    ssh -N -R 2222:localhost:22 ${REMOTE_USER}@${REMOTE_HOST}"
         return 2
     fi
 
     # Execute scp via reverse tunnel
-    echo "📦 Sending '$file_path' to local-machine:$save_path ..."
-    scp -P "$tunnel_port" "$file_path" "${local-machine_user}@${local-machine_host}:${save_path}"
+    echo "📦 Sending '$file_path' to local:$save_path ..."
+    scp -P "$tunnel_port" "$file_path" "${local_machine_user}@${local_machine_host}:${save_path}"
 
     if [[ $? -eq 0 ]]; then
-        echo "✅ Successfully downloaded to local-machine:$save_path"
+        echo "✅ Successfully downloaded to local:$save_path"
     else
         echo "❌ Failed to download. Double-check file paths and SSH access."
         return 3

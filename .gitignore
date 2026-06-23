@@ -5,7 +5,6 @@ linux/bashconfig/.inject_secrets
 # Environment / credentials
 .env
 .env.*
-*.local
 
 # Font cache
 linux/homedir/.fonts/.uuid

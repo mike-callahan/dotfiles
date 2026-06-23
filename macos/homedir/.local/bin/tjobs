@@ -1,0 +1,369 @@
+#!/usr/bin/env bash
+# tjobs - tmux-backed background job manager
+# Usage: tjobs <command> [args]
+#
+# Commands:
+#   new [-n name] <cmd> [args...]  Start a new background job
+#   list                           List all jobs with status
+#   attach <name|id>               Attach to a running job's tmux session
+#   peek <name|id>                 Dump job log to stdout
+#   follow <name|id>               Tail job log live
+#   kill <name|id>                 Kill a running job
+#   clean                        Remove logs/state for finished jobs
+#   log-mode <on|off>            Toggle syslog globally (writes ~/.tjobs/config)
+#   help                         Show this help
+
+set -euo pipefail
+
+# ── config ────────────────────────────────────────────────────────────────────
+
+TJOBS_DIR="${TJOBS_DIR:-$HOME/.tjobs}"
+TJOBS_CONFIG="$TJOBS_DIR/config"
+SESSION_PREFIX="job-"
+
+# Load persisted config (e.g. USE_SYSLOG=1)
+[[ -f "$TJOBS_CONFIG" ]] && source "$TJOBS_CONFIG"
+USE_SYSLOG="${USE_SYSLOG:-0}"
+
+# ── colors ────────────────────────────────────────────────────────────────────
+
+if [[ -t 1 ]]; then
+  C_GREEN=$'\033[32m'
+  C_BLUE=$'\033[34m'
+  C_RED=$'\033[31m'
+  C_YELLOW=$'\033[33m'
+  C_GRAY=$'\033[90m'
+  C_BOLD=$'\033[1m'
+  C_RESET=$'\033[0m'
+else
+  C_GREEN='' C_BLUE='' C_RED='' C_YELLOW='' C_GRAY='' C_BOLD='' C_RESET=''
+fi
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+_init() {
+  mkdir -p "$TJOBS_DIR"
+}
+
+_session_name() {
+  echo "${SESSION_PREFIX}${1}"
+}
+
+_job_name() {
+  # Strip prefix from session name
+  echo "${1#$SESSION_PREFIX}"
+}
+
+_status_file() { echo "$TJOBS_DIR/${SESSION_PREFIX}${1}.status"; }
+_log_file()    { echo "$TJOBS_DIR/${SESSION_PREFIX}${1}.log"; }
+_pid_file()    { echo "$TJOBS_DIR/${SESSION_PREFIX}${1}.pid"; }
+
+_tmux_has_session() {
+  tmux has-session -t "$(_session_name "$1")" 2>/dev/null
+}
+
+_read_status() {
+  local sf
+  sf=$(_status_file "$1")
+  [[ -f "$sf" ]] && cat "$sf" || echo "UNKNOWN"
+}
+
+# Reconcile status file against live tmux sessions
+# If status says RUNNING but no session exists, mark STOPPED
+_reconcile_status() {
+  local name=$1
+  local status
+  status=$(_read_status "$name")
+  if [[ "$status" == "RUNNING" ]] && ! _tmux_has_session "$name"; then
+    echo "STOPPED" > "$(_status_file "$name")"
+    status="STOPPED"
+  fi
+  echo "$status"
+}
+
+_status_color() {
+  case "$1" in
+    RUNNING)   echo -e "${C_GREEN}$1${C_RESET}" ;;
+    DONE:0)    echo -e "${C_BLUE}DONE${C_RESET}" ;;
+    FAILED:*)  echo -e "${C_RED}$1${C_RESET}" ;;
+    STOPPED)   echo -e "${C_YELLOW}$1${C_RESET}" ;;
+    STARTING)  echo -e "${C_GRAY}$1${C_RESET}" ;;
+    *)         echo "$1" ;;
+  esac
+}
+
+_die() {
+  echo -e "${C_RED}error:${C_RESET} $*" >&2
+  exit 1
+}
+
+_require_name() {
+  [[ -n "${1:-}" ]] || _die "job name or number required"
+}
+
+_next_id() {
+  local id_file="$TJOBS_DIR/next_id"
+  local id
+  id=$( [[ -f "$id_file" ]] && cat "$id_file" || echo 1 )
+  echo $(( id + 1 )) > "$id_file"
+  echo "$id"
+}
+
+# ── internal runner (executed inside tmux session) ────────────────────────────
+# Exported so bash -c can see it
+
+_tjobs_runner() {
+  local name=$1; shift
+  local logfile pid_file status_file
+  logfile=$(_log_file "$name")
+  pid_file=$(_pid_file "$name")
+  status_file=$(_status_file "$name")
+
+  echo "RUNNING" > "$status_file"
+  echo $$ > "$pid_file"
+
+  [[ "$USE_SYSLOG" == "1" ]] && logger -t "tjob/$name" "START: $*"
+
+  if [[ "$USE_SYSLOG" == "1" ]]; then
+    "$@" 2>&1 | tee "$logfile" | logger -t "tjob/$name"
+  else
+    "$@" 2>&1 | tee "$logfile"
+  fi
+
+  local exit_code=${PIPESTATUS[0]}
+
+  if [[ $exit_code -eq 0 ]]; then
+    echo "DONE:$exit_code" > "$status_file"
+  else
+    echo "FAILED:$exit_code" > "$status_file"
+  fi
+
+  [[ "$USE_SYSLOG" == "1" ]] && logger -t "tjob/$name" "END: exit=$exit_code"
+  rm -f "$pid_file"
+}
+
+SELF=$(realpath "${BASH_SOURCE[0]}")
+
+# ── commands ──────────────────────────────────────────────────────────────────
+
+cmd_new() {
+  [[ $# -ge 1 ]] || _die "usage: tjobs new [-n name] <command> [args...]"
+  _init
+
+  local name
+  if [[ "${1:-}" == "-n" ]]; then
+    [[ -n "${2:-}" ]] || _die "-n requires a name"
+    name=$2; shift 2
+    [[ $# -ge 1 ]] || _die "usage: tjobs new -n <name> <command> [args...]"
+  else
+    name=$(_next_id)
+  fi
+
+  local session
+  session=$(_session_name "$name")
+
+  if _tmux_has_session "$name"; then
+    _die "job '$name' already exists. Kill it first with: tjobs kill $name"
+  fi
+
+  local status_file log_file
+  status_file=$(_status_file "$name")
+  log_file=$(_log_file "$name")
+
+  echo "STARTING" > "$status_file"
+  : > "$log_file"
+
+  # Build the command string - quote each arg properly
+  local cmd_str
+  cmd_str=$(printf '%q ' "$@")
+
+  tmux new-session -d -s "$session" -x 220 -y 50 \
+    "$SELF" _run "$name" "$@"
+
+  echo -e "Started job ${C_BOLD}$name${C_RESET}"
+  echo -e "  session: $session"
+  echo -e "  log:     $log_file"
+  echo -e "  follow:  tjobs follow $name"
+}
+
+cmd_list() {
+  _init
+
+  # Collect all known jobs from status files
+  local found=0
+
+  # Header
+  printf "${C_BOLD}%-20s %-12s %s${C_RESET}\n" "ID/NAME" "STATUS" "LOG"
+  printf "%-20s %-12s %s\n" "$(printf '%.0s-' {1..20})" "$(printf '%.0s-' {1..12})" "$(printf '%.0s-' {1..30})"
+
+  for sf in "$TJOBS_DIR"/${SESSION_PREFIX}*.status; do
+    [[ -e "$sf" ]] || continue
+    found=1
+
+    local basename name status colored_status
+    basename=$(basename "$sf" .status)
+    name=$(_job_name "$basename")
+    status=$(_reconcile_status "$name")
+    colored_status=$(_status_color "$status")
+
+    printf "%-20s %-22s %s\n" \
+      "$name" \
+      "$colored_status" \
+      "$(_log_file "$name")"
+  done
+
+  [[ $found -eq 0 ]] && echo -e "${C_GRAY}No jobs found.${C_RESET}"
+}
+
+cmd_attach() {
+  _require_name "${1:-}"
+  local name=$1
+  _tmux_has_session "$name" || _die "no active session for '$name' (job may have finished, use: tjobs peek $name)"
+  tmux attach -t "$(_session_name "$name")"
+}
+
+cmd_peek() {
+  _require_name "${1:-}"
+  local name=$1
+  local logfile
+  logfile=$(_log_file "$name")
+  [[ -f "$logfile" ]] || _die "no log found for '$name'"
+  echo -e "${C_GRAY}==> $logfile <==${C_RESET}"
+  cat "$logfile"
+}
+
+cmd_follow() {
+  _require_name "${1:-}"
+  local name=$1
+  local logfile
+  logfile=$(_log_file "$name")
+  [[ -f "$logfile" ]] || _die "no log found for '$name'"
+  echo -e "${C_GRAY}Following $logfile (Ctrl+C to stop)${C_RESET}"
+  tail -f "$logfile"
+}
+
+cmd_kill() {
+  _require_name "${1:-}"
+  local name=$1
+  local session
+  session=$(_session_name "$name")
+
+  if _tmux_has_session "$name"; then
+    tmux kill-session -t "$session"
+    echo "Killed session '$name'"
+  else
+    echo "No active session for '$name'"
+  fi
+
+  local sf
+  sf=$(_status_file "$name")
+  [[ -f "$sf" ]] && echo "STOPPED" > "$sf"
+}
+
+cmd_clean() {
+  _init
+  local cleaned=0
+
+  for sf in "$TJOBS_DIR"/${SESSION_PREFIX}*.status; do
+    [[ -e "$sf" ]] || continue
+    local status
+    status=$(cat "$sf")
+    case "$status" in
+      DONE:*|FAILED:*|STOPPED)
+        local basename name
+        basename=$(basename "$sf" .status)
+        name=$(_job_name "$basename")
+        rm -f "$sf" "$(_log_file "$name")" "$(_pid_file "$name")"
+        echo "Cleaned '$name'"
+        ((cleaned++))
+        ;;
+    esac
+  done
+
+  [[ $cleaned -eq 0 ]] && echo "Nothing to clean."
+}
+
+cmd_log_mode() {
+  local mode="${1:-}"
+  case "$mode" in
+    on|1)
+      echo "USE_SYSLOG=1" > "$TJOBS_CONFIG"
+      echo "Syslog enabled. New jobs will log to syslog."
+      ;;
+    off|0)
+      echo "USE_SYSLOG=0" > "$TJOBS_CONFIG"
+      echo "Syslog disabled."
+      ;;
+    *)
+      _die "usage: tjobs log-mode <on|off>"
+      ;;
+  esac
+}
+
+cmd_help() {
+  cat <<EOF
+${C_BOLD}tjobs${C_RESET} - tmux-backed background job manager
+
+${C_BOLD}USAGE${C_RESET}
+  tjobs <command> [args]
+
+${C_BOLD}COMMANDS${C_RESET}
+  ${C_GREEN}new${C_RESET} [-n name] <cmd> [args...]  Start a new background job
+  ${C_GREEN}list${C_RESET}                            List all jobs with status
+  ${C_GREEN}attach${C_RESET} <name|id>                Attach to a running job's tmux session
+  ${C_GREEN}peek${C_RESET} <name|id>                  Dump job log to stdout
+  ${C_GREEN}follow${C_RESET} <name|id>                Tail job log live (Ctrl+C to stop)
+  ${C_GREEN}kill${C_RESET} <name|id>                  Kill a running job
+  ${C_GREEN}clean${C_RESET}                        Remove state for finished/stopped jobs
+  ${C_GREEN}log-mode${C_RESET} <on|off>            Toggle syslog for new jobs
+  ${C_GREEN}help${C_RESET}                         Show this help
+
+${C_BOLD}STATUS VALUES${C_RESET}
+  ${C_GREEN}RUNNING${C_RESET}    Job is active
+  ${C_BLUE}DONE${C_RESET}       Finished with exit code 0
+  ${C_RED}FAILED:N${C_RESET}   Finished with non-zero exit code N
+  ${C_YELLOW}STOPPED${C_RESET}    Session was killed or crashed
+  ${C_GRAY}STARTING${C_RESET}   Job is initializing
+
+${C_BOLD}EXAMPLES${C_RESET}
+  tjobs new python train.py --epochs 100       # auto-numbered
+  tjobs new -n train python train.py           # named job
+  tjobs list
+  tjobs follow 1
+  tjobs follow train
+  tjobs peek 1
+  tjobs attach train
+  tjobs kill 1
+  tjobs clean
+
+${C_BOLD}CONFIG${C_RESET}
+  State dir:  ${TJOBS_DIR}
+  Syslog:     $([ "$USE_SYSLOG" = "1" ] && echo "on" || echo "off")
+
+${C_BOLD}SYSLOG${C_RESET}
+  tjobs log-mode on
+  journalctl -t tjob/train -f         # systemd
+  grep 'tjob/' /var/log/syslog        # syslog
+EOF
+}
+
+# ── dispatch ──────────────────────────────────────────────────────────────────
+
+[[ $# -ge 1 ]] || { cmd_help; exit 0; }
+
+command="$1"; shift
+
+case "$command" in
+  new)      cmd_new "$@" ;;
+  list|ls)  cmd_list "$@" ;;
+  attach)   cmd_attach "$@" ;;
+  peek)     cmd_peek "$@" ;;
+  follow)   cmd_follow "$@" ;;
+  kill)     cmd_kill "$@" ;;
+  clean)    cmd_clean "$@" ;;
+  log-mode) cmd_log_mode "$@" ;;
+  help|-h|--help) cmd_help ;;
+  # Internal: called from within tmux session
+  _run)     _tjobs_runner "$@" ;;
+  *)        _die "unknown command '$command'. Run: tjobs help" ;;
+esac
