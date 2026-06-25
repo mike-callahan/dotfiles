@@ -1,0 +1,45 @@
+# Homebrew bundle manifest. Apply with:
+#   brew bundle install --file=~/.config/dotfiles/macos/Brewfile
+# Or via the wrapper:
+#   ./macos/brew-install.sh
+#
+# To refresh from the current machine's state:
+#   brew bundle dump --file=~/.config/dotfiles/macos/Brewfile --force
+# (note: dump captures ALL installed formulae, not just top-level; review before committing)
+
+# ── Formulae ─────────────────────────────────────────────────────────────────
+brew "arping"
+brew "atuin"
+brew "bash"
+brew "bash-completion"
+brew "coreutils"
+brew "dos2unix"
+brew "gh"
+brew "git"
+brew "gnu-tar"
+brew "iperf3"
+brew "jq"
+brew "neovim"
+brew "openssh"
+brew "rsync"
+brew "ssh-copy-id"
+brew "telnet"
+brew "tpm"
+brew "wget"
+brew "yq"
+
+# ── Casks ────────────────────────────────────────────────────────────────────
+cask "1password@beta"
+cask "betterdisplay"
+cask "claude-code"
+cask "docker-desktop"
+cask "firefox"
+cask "karabiner-elements"
+cask "middle"
+cask "rectangle-pro"
+cask "royal-tsx"
+cask "tailscale-app"
+cask "thaw"
+cask "unnaturalscrollwheels"
+cask "visual-studio-code"
+cask "windows-app"

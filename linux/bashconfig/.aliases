@@ -26,3 +26,6 @@ alias whitespace="sed 's/ /·/g;s/\t/￫/g;s/\r/§/g;s/$/¶/g'"
 
 # Use Rsync to copy
 alias rcp="rsync -HAXhaxvPS --numeric-ids --stats"
+
+# Use neovim when invoking vim
+alias vim="nvim"

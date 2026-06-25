@@ -1,0 +1,27 @@
+{
+  "title": "Terminal-aware Spotlight",
+  "rules": [
+    {
+      "description": "Disable Cmd-Space (Spotlight) when Terminal.app is frontmost",
+      "manipulators": [
+        {
+          "type": "basic",
+          "from": {
+            "key_code": "spacebar",
+            "modifiers": {
+              "mandatory": ["command"]
+            }
+          },
+          "conditions": [
+            {
+              "type": "frontmost_application_if",
+              "bundle_identifiers": [
+                "^com\\.apple\\.Terminal$"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -50,3 +50,5 @@ if [ -f /opt/homebrew/bin/atuin ]; then
 else
 	echo Atuin might not be installed
 fi
+
+export PATH="$PATH:$HOME/.local/bin"

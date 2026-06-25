@@ -1,0 +1,54 @@
+{
+  "title": "Ctrl+Shift+C/V copy/paste in terminals",
+  "rules": [
+    {
+      "description": "Ctrl+Shift+C/V to Copy/Paste in Terminal and iTerm2",
+      "manipulators": [
+        {
+          "conditions": [
+            {
+              "bundle_identifiers": [
+                "^com\\.apple\\.Terminal$",
+                "^com\\.apple\\.iTerm2$"
+              ],
+              "type": "frontmost_application_if"
+            }
+          ],
+          "from": {
+            "key_code": "c",
+            "modifiers": { "mandatory": ["control", "shift"] }
+          },
+          "to": [
+            {
+              "key_code": "c",
+              "modifiers": ["command"]
+            }
+          ],
+          "type": "basic"
+        },
+        {
+          "conditions": [
+            {
+              "bundle_identifiers": [
+                "^com\\.apple\\.Terminal$",
+                "^com\\.apple\\.iTerm2$"
+              ],
+              "type": "frontmost_application_if"
+            }
+          ],
+          "from": {
+            "key_code": "v",
+            "modifiers": { "mandatory": ["control", "shift"] }
+          },
+          "to": [
+            {
+              "key_code": "v",
+              "modifiers": ["command"]
+            }
+          ],
+          "type": "basic"
+        }
+      ]
+    }
+  ]
+}
