@@ -137,7 +137,7 @@ git-save() { (
   INCLUDE_IGNORED="false"
   MESSAGE="Snapshot of working tree"
   QUIET="false"
-  URL_FORMAT="https"  # Options: "https" or "ssh"
+  URL_FORMAT="ssh"  # Options: "https" or "ssh"
 
   # ============================================================================
   # Core Functions
@@ -362,4 +362,19 @@ Includes: working tree (untracked included$([[ "$INCLUDE_IGNORED" == "true" ]] &
   echo "❌ Gave up after $max_tries attempts; snapshot branch kept moving or push kept failing." >&2
   exit 1
 ); }
+
+# gsync - fetch once, then fast-forward every worktree to its upstream.
+# Safe by design: never prompts, never merges non-ff, never touches dirty worktrees.
+# Handy from the root of a gclone-style setup (where `git pull` doesn't work).
+gsync() {
+  git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ Not a git repo."; return 1; }
+
+  echo "→ fetch --all --prune"
+  git fetch --all --prune || return 1
+
+  git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt; do
+    printf '→ %s\n' "$wt"
+    git -C "$wt" merge --ff-only '@{u}' 2>&1 | sed 's/^/    /'
+  done
+}
 
