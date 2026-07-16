@@ -1,6 +1,6 @@
 ### Use this dotfile to add items to PATH ###
 export PATH="$PATH:$HOMEBREW_PREFIX/bin"
 export PATH="$PATH:$HOMEBREW_PREFIX/share/google-cloud-sdk/bin"
-export PATH="~/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOMEBREW_PREFIX/opt/make/libexec/gnubin:$PATH"
-export PATH="$HOMEBREW_PREFIX/opt/coreutils/libexec/gnubin"
+export PATH="$HOMEBREW_PREFIX/opt/coreutils/libexec/gnubin:$PATH"

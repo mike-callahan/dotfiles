@@ -1,0 +1,73 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+format = """
+$username\
+[ at ](white)\
+${custom.hostname_normal}\
+${custom.hostname_ssh}\
+[ in ](white)\
+$directory\
+$git_branch\
+${custom.worktree}\
+$git_status\
+$line_break\
+$character\
+"""
+
+[username]
+style_user = "#d75f00"
+style_root = "bold #af0000"
+format = "[$user]($style)"
+show_always = true
+
+[hostname]
+disabled = true
+
+[custom.hostname_normal]
+command = "hostname | tr '[:lower:]' '[:upper:]'"
+when = '[ -z "$SSH_TTY" ]'
+format = "[$output](#af8700)"
+shell = ["bash", "--noprofile", "--norc"]
+
+[custom.hostname_ssh]
+command = "hostname | tr '[:lower:]' '[:upper:]'"
+when = '[ -n "$SSH_TTY" ]'
+format = "[$output](bold #af0000)"
+shell = ["bash", "--noprofile", "--norc"]
+
+[directory]
+style = "#5f8700"
+format = "[$path]($style)"
+truncation_length = 0
+truncate_to_repo = false
+home_symbol = "~"
+
+[git_branch]
+format = "[ on ](white)[$branch](#5f5faf)"
+symbol = ""
+
+# Matches bash prompt: [+!?$] in blue
+# + staged  ! unstaged  ? untracked  $ stash
+[git_status]
+format = '([\[$staged$modified$untracked$stashed\]](#0087ff))'
+staged = "+"
+modified = "!"
+untracked = "?"
+stashed = '\$'
+conflicted = ""
+deleted = ""
+renamed = ""
+ahead = ""
+behind = ""
+diverged = ""
+
+# Show (wt) in violet when in a linked git worktree
+[custom.worktree]
+command = 'echo " (wt)"'
+when = 'git rev-parse --git-dir >/dev/null 2>&1 && [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ]'
+format = "[$output](#5f5faf)"
+shell = ["bash", "--noprofile", "--norc"]
+
+[character]
+success_symbol = "[\\$](white)"
+error_symbol = "[\\$](white)"
