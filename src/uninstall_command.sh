@@ -13,6 +13,14 @@ if test -f ~/.dotfilelock; then
     while IFS= read -r -d '' file; do
         relpath="${file#$homedir/}"
 
+        # Match the renaming done by 'install --server'.
+        if [[ ${args[--server]} ]]; then
+            case "$relpath" in
+                .bashrc)       relpath=".mikerc" ;;
+                .bash_profile) relpath=".mike_profile" ;;
+            esac
+        fi
+
         if [ -L ~/"$relpath" ]; then
             echo "removing symlink for $relpath"
             rm ~/"$relpath"

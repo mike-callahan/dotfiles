@@ -73,6 +73,11 @@ dotfiles_install_usage() {
     printf "    Skip files that already exist instead of erroring out.\n"
     echo
 
+    # :flag.usage
+    printf "  %s\n" "--server"
+    printf "    Install .bashrc and .bash_profile as .mikerc and .mike_profile, preserving\n    any existing ones.\n"
+    echo
+
     # :command.usage_fixed_flags
     printf "  %s\n" "--help, -h"
     printf "    Show this help\n"
@@ -122,6 +127,11 @@ dotfiles_uninstall_usage() {
     printf "  %s\n" "--platform PLATFORM (required)"
     printf "    One of linux or macos.\n"
     printf "    %s\n" "Allowed: linux, macos"
+    echo
+
+    # :flag.usage
+    printf "  %s\n" "--server"
+    printf "    Also remove .mikerc and .mike_profile (installed via 'install --server').\n"
     echo
 
     # :command.usage_fixed_flags
@@ -227,6 +237,15 @@ dotfiles_install_command() {
           # Get the path relative to homedir (e.g. .fonts/SomeFont.ttf, .local/bin/tjobs)
           relpath="${file#$homedir/}"
 
+          # On a server, install the bash startup files under alternate names so an
+          # existing .bashrc / .bash_profile is left untouched and can source these.
+          if [[ ${args[--server]} ]]; then
+              case "$relpath" in
+                  .bashrc)       relpath=".mikerc" ;;
+                  .bash_profile) relpath=".mike_profile" ;;
+              esac
+          fi
+
           # Create the parent directory in ~ if it doesn't exist
           mkdir -p ~/$(dirname "$relpath")
 
@@ -296,6 +315,14 @@ dotfiles_uninstall_command() {
       # Remove symlinks for all managed files
       while IFS= read -r -d '' file; do
           relpath="${file#$homedir/}"
+
+          # Match the renaming done by 'install --server'.
+          if [[ ${args[--server]} ]]; then
+              case "$relpath" in
+                  .bashrc)       relpath=".mikerc" ;;
+                  .bash_profile) relpath=".mike_profile" ;;
+              esac
+          fi
 
           if [ -L ~/"$relpath" ]; then
               echo "removing symlink for $relpath"
@@ -451,6 +478,14 @@ dotfiles_install_parse_requirements() {
         shift
         ;;
 
+      # :flag.case
+      --server)
+
+        # :flag.case_no_arg
+        args['--server']=1
+        shift
+        ;;
+
       -?*)
         printf "invalid option: %s\n" "$key" >&2
         exit 1
@@ -568,6 +603,14 @@ dotfiles_uninstall_parse_requirements() {
           printf "%s\n" "--platform requires an argument: --platform PLATFORM" >&2
           exit 1
         fi
+        ;;
+
+      # :flag.case
+      --server)
+
+        # :flag.case_no_arg
+        args['--server']=1
+        shift
         ;;
 
       -?*)

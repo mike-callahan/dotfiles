@@ -14,6 +14,8 @@ commands:
   - long: --skip-existing
     short: -s
     help: Skip files that already exist instead of erroring out.
+  - long: --server
+    help: Install .bashrc and .bash_profile as .mikerc and .mike_profile, preserving any existing ones.
 
 - name: backup
   help: backup any existing dotfiles to a tar.gz
@@ -26,6 +28,8 @@ commands:
     help: One of linux or macos.
     allowed: [linux, macos]
     required: true
+  - long: --server
+    help: Also remove .mikerc and .mike_profile (installed via 'install --server').
 
 # examples:
 # - cli download example.com

@@ -23,6 +23,15 @@ if test -f ~/.dotfilelock; then
         # Get the path relative to homedir (e.g. .fonts/SomeFont.ttf, .local/bin/tjobs)
         relpath="${file#$homedir/}"
 
+        # On a server, install the bash startup files under alternate names so an
+        # existing .bashrc / .bash_profile is left untouched and can source these.
+        if [[ ${args[--server]} ]]; then
+            case "$relpath" in
+                .bashrc)       relpath=".mikerc" ;;
+                .bash_profile) relpath=".mike_profile" ;;
+            esac
+        fi
+
         # Create the parent directory in ~ if it doesn't exist
         mkdir -p ~/$(dirname "$relpath")
 
