@@ -13,17 +13,22 @@ if test -f ~/.dotfilelock; then
     while IFS= read -r -d '' file; do
         relpath="${file#$homedir/}"
 
-        # Match the renaming done by 'install --server'.
-        if [[ ${args[--server]} ]]; then
-            case "$relpath" in
-                .bashrc)       relpath=".mikerc" ;;
-                .bash_profile) relpath=".mike_profile" ;;
-            esac
-        fi
+        # Match the renaming done by install.
+        case "$relpath" in
+            .bashrc)       relpath=".mikerc" ;;
+            .bash_profile) relpath=".mike_profile" ;;
+        esac
 
+        # Only remove symlinks that point into this repo's homedir — never
+        # delete a symlink the user created themselves.
         if [ -L ~/"$relpath" ]; then
-            echo "removing symlink for $relpath"
-            rm ~/"$relpath"
+            target=$(readlink ~/"$relpath")
+            if [[ "$target" == "$homedir"/* ]]; then
+                echo "removing symlink for $relpath"
+                rm ~/"$relpath"
+            else
+                echo "skipping $relpath: symlink not managed by dotfiles (-> $target)"
+            fi
         fi
 
     done < <(find "$homedir" -type f -print0)
