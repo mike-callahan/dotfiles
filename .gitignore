@@ -1,6 +1,12 @@
 # Secrets
-linux/bashconfig/.secrets
-linux/bashconfig/.inject_secrets
+*/bashconfig/.secrets
+*/bashconfig/.inject_secrets
+
+# Backup tarballs (created by 'dotfiles backup' / first install)
+dotfiles.tar-*
+*.tar
+*.tar.gz
+*.tgz
 
 # Environment / credentials
 .env
