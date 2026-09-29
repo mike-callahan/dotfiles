@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# clipboard — one command for both clipboard directions.
+#
+#   cmd | clipboard     copy stdin to the clipboard
+#   clipboard | cmd     paste the clipboard to stdout
+#   clipboard > file    paste the clipboard into a file
+#
+# Direction is auto-detected: if stdin is not a terminal, copy; otherwise paste.
+# Tool cascade: pbcopy/pbpaste (macOS) -> wl-copy/wl-paste (Wayland) ->
+# xclip/xsel (X11) -> tmux buffer + OSC 52 (headless/ssh). Copying over ssh
+# works in any OSC 52-capable terminal; pasting there needs a tmux session.
+
+set -u
+
+die() { echo "clipboard: $*" >&2; exit 1; }
+
+usage() {
+    sed -n '2,12s/^# \{0,1\}//p' "$0"
+}
+
+do_copy() {
+    if command -v pbcopy >/dev/null; then
+        exec pbcopy
+    elif [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null; then
+        exec wl-copy
+    elif [ -n "${DISPLAY:-}" ] && command -v xclip >/dev/null; then
+        exec xclip -selection clipboard -in
+    elif [ -n "${DISPLAY:-}" ] && command -v xsel >/dev/null; then
+        exec xsel --clipboard --input
+    fi
+
+    # Headless (e.g. ssh): stash stdin base64-encoded so it can be replayed.
+    local b64
+    b64=$(base64 | tr -d '\n')
+
+    if [ -n "${TMUX:-}" ]; then
+        # -w (tmux >= 3.2) also forwards the buffer to the outer terminal's
+        # clipboard; older tmux still gets a paste buffer.
+        printf '%s' "$b64" | base64 -d | tmux load-buffer -w - 2>/dev/null ||
+            printf '%s' "$b64" | base64 -d | tmux load-buffer -
+    elif [ -w /dev/tty ]; then
+        # OSC 52: ask the terminal itself to set the clipboard.
+        printf '\033]52;c;%s\a' "$b64" > /dev/tty
+    else
+        die "no clipboard tool found (install wl-clipboard or xclip, or run inside tmux)"
+    fi
+}
+
+do_paste() {
+    if command -v pbpaste >/dev/null; then
+        exec pbpaste
+    elif [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-paste >/dev/null; then
+        exec wl-paste --no-newline
+    elif [ -n "${DISPLAY:-}" ] && command -v xclip >/dev/null; then
+        exec xclip -selection clipboard -out
+    elif [ -n "${DISPLAY:-}" ] && command -v xsel >/dev/null; then
+        exec xsel --clipboard --output
+    elif [ -n "${TMUX:-}" ]; then
+        exec tmux save-buffer -
+    fi
+    die "no clipboard tool found to paste from (install wl-clipboard or xclip, or run inside tmux)"
+}
+
+case "${1:-}" in
+    -h | --help) usage; exit 0 ;;
+    '') ;;
+    *) die "unknown argument: $1 (try --help)" ;;
+esac
+
+if [ -t 0 ]; then
+    do_paste
+else
+    do_copy
+fi
