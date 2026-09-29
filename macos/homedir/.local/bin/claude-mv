@@ -1,0 +1,242 @@
+#!/bin/bash
+set -e
+
+# Usage: claude-mv <old_directory> <new_directory>
+
+if [ $# -ne 2 ]; then
+    echo "Usage: claude-mv <old_directory> <new_directory>"
+    echo "Example: claude-mv ~/old-project ~/new-project"
+    exit 1
+fi
+
+OLD_DIR="$1"
+NEW_DIR="$2"
+
+# Warn and strip trailing slashes — they corrupt the encoded path
+if [[ "$OLD_DIR" == */ ]]; then
+    echo "Warning: trailing slash on source path, stripping: $OLD_DIR"
+    OLD_DIR="${OLD_DIR%/}"
+fi
+if [[ "$NEW_DIR" == */ ]]; then
+    echo "Warning: trailing slash on destination path, stripping: $NEW_DIR"
+    NEW_DIR="${NEW_DIR%/}"
+fi
+
+# Resolve old directory to absolute path
+OLD_ABS=$(cd "$OLD_DIR" 2>/dev/null && pwd || echo "")
+
+if [ -z "$OLD_ABS" ]; then
+    echo "Error: Old directory does not exist: $OLD_DIR"
+    exit 1
+fi
+
+# Check if new directory already exists
+DIR_MERGE=false
+if [ -e "$NEW_DIR" ]; then
+    # On case-insensitive filesystems (macOS default), a case-only rename resolves
+    # to the same inode — detect that so we don't treat it as a conflict.
+    NEW_EXISTS_ABS=$(cd "$NEW_DIR" 2>/dev/null && pwd || echo "")
+    if [ "$NEW_EXISTS_ABS" != "$OLD_ABS" ]; then
+        echo "Warning: Target directory already exists: $NEW_DIR"
+        echo ""
+        echo "Options:"
+        echo "  [m] Merge: move all contents from $OLD_DIR into $NEW_DIR"
+        echo "  [n] Abort (default)"
+        echo ""
+        read -p "Choose [m/N]: " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Mm]$ ]]; then
+            DIR_MERGE=true
+        else
+            echo "Aborted."
+            exit 1
+        fi
+    fi
+fi
+
+# Convert paths to Claude's format (replace / and . with -)
+# Need to do this BEFORE moving the directory to check for existing context
+OLD_ENCODED=$(echo "$OLD_ABS" | sed 's/[\/.]/-/g')
+
+# Figure out what the new absolute path will be
+if [[ "$NEW_DIR" = /* ]]; then
+    # NEW_DIR is already absolute
+    NEW_ABS_FUTURE="$NEW_DIR"
+else
+    # NEW_DIR is relative, resolve it
+    NEW_PARENT=$(dirname "$NEW_DIR")
+    NEW_BASENAME=$(basename "$NEW_DIR")
+    if [ "$NEW_PARENT" = "." ]; then
+        NEW_ABS_FUTURE="$(pwd)/$NEW_BASENAME"
+    else
+        NEW_ABS_FUTURE="$(cd "$NEW_PARENT" 2>/dev/null && pwd)/$NEW_BASENAME"
+    fi
+fi
+
+NEW_ENCODED=$(echo "$NEW_ABS_FUTURE" | sed 's/[\/.]/-/g')
+
+# Bail out if both paths encode identically — happens on case-insensitive filesystems
+# when `cd old && pwd` returns the actual stored case matching the new path.
+# Continuing would cause the merge loop to rm -rf every context directory into itself.
+if [ "$OLD_ENCODED" = "$NEW_ENCODED" ]; then
+    echo "Error: source and destination resolve to the same encoded path."
+    echo "  source: $OLD_ABS → $OLD_ENCODED"
+    echo "  dest:   $NEW_ABS_FUTURE → $NEW_ENCODED"
+    echo "On a case-insensitive filesystem, 'cd \$OLD && pwd' returns the stored case."
+    echo "Nothing to do — the directory is already named '$NEW_ABS_FUTURE'."
+    exit 1
+fi
+
+CLAUDE_DIR="$HOME/.claude"
+
+# Find all Claude context entries whose encoded name equals PREFIX or starts with PREFIX-
+# (exact match = the directory itself; PREFIX- prefix = nested subdirectories)
+claude_entries_for_prefix() {
+    local subdir="$1" prefix="$2"
+    local dir="$CLAUDE_DIR/$subdir"
+    [ -d "$dir" ] || return
+    for entry in "$dir/${prefix}"*; do
+        [ -e "$entry" ] || continue
+        local name
+        name=$(basename "$entry")
+        if [ "$name" = "$prefix" ] || [[ "$name" == "${prefix}-"* ]]; then
+            echo "$entry"
+        fi
+    done
+}
+
+# Compute the new encoded name for a matched entry
+recode_entry() {
+    local name="$1"
+    local suffix="${name#$OLD_ENCODED}"   # "" for exact, "-foo-bar" for nested
+    echo "${NEW_ENCODED}${suffix}"
+}
+
+# Check if destination Claude context already exists BEFORE moving directory
+EXISTING_ENTRIES=()
+for subdir in projects file-history todos shell-snapshots debug; do
+    while IFS= read -r entry; do
+        EXISTING_ENTRIES+=("$subdir:$(basename "$entry")")
+    done < <(claude_entries_for_prefix "$subdir" "$NEW_ENCODED")
+done
+
+# If destination context exists, prompt user BEFORE moving anything
+if [ ${#EXISTING_ENTRIES[@]} -gt 0 ]; then
+    echo "Warning: Claude context already exists for $NEW_ABS_FUTURE:"
+    for item in "${EXISTING_ENTRIES[@]}"; do
+        echo "  - $item"
+    done
+    echo ""
+    echo "Options:"
+    echo "  [c] Clean out existing context and continue"
+    echo "  [m] Merge old context into existing context"
+    echo "  [n] Abort (default)"
+    echo ""
+    read -p "Choose [c/m/N]: " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Cc]$ ]]; then
+        echo "Cleaning out existing context for $NEW_ABS_FUTURE..."
+        for item in "${EXISTING_ENTRIES[@]}"; do
+            subdir="${item%%:*}"
+            name="${item#*:}"
+            rm -rf "$CLAUDE_DIR/$subdir/$name"
+            echo "  ✓ Removed $subdir/$name"
+        done
+        echo ""
+    elif [[ $REPLY =~ ^[Mm]$ ]]; then
+        echo "Will merge contexts..."
+    else
+        echo "Aborted."
+        exit 1
+    fi
+fi
+
+echo "Moving Claude context from:"
+echo "  $OLD_ABS"
+echo "  → $NEW_ABS_FUTURE"
+echo ""
+
+MOVED=0
+
+# Rename/merge all matching entries (exact path + nested subdirectories)
+for subdir in projects file-history todos shell-snapshots debug; do
+    while IFS= read -r old_entry; do
+        old_name=$(basename "$old_entry")
+        new_name=$(recode_entry "$old_name")
+        new_entry="$CLAUDE_DIR/$subdir/$new_name"
+
+        if [ -d "$old_entry" ]; then
+            if [ "$old_entry" = "$new_entry" ]; then
+                continue
+            elif [ -d "$new_entry" ]; then
+                echo "Merging $subdir/$old_name → $subdir/$new_name"
+                mv "$old_entry"/* "$new_entry/" 2>/dev/null || true
+                rmdir "$old_entry" 2>/dev/null || rm -rf "$old_entry"
+            else
+                echo "Moving $subdir/$old_name → $subdir/$new_name"
+                mv "$old_entry" "$new_entry"
+            fi
+        elif [ -f "$old_entry" ]; then
+            echo "Moving $subdir/$old_name → $subdir/$new_name"
+            mv "$old_entry" "$new_entry"
+        fi
+        MOVED=$((MOVED + 1))
+    done < <(claude_entries_for_prefix "$subdir" "$OLD_ENCODED")
+done
+
+if [ $MOVED -eq 0 ]; then
+    echo "No Claude context found for $OLD_ABS"
+else
+    echo "✓ Moved $MOVED context location(s)"
+fi
+
+echo ""
+
+# Update session file contents to reference new path (all nested project dirs)
+SESSION_UPDATED=0
+while IFS= read -r proj_entry; do
+    SESSION_FILES=$(find "$proj_entry" -name "*.jsonl" 2>/dev/null)
+    if [ -n "$SESSION_FILES" ]; then
+        find "$proj_entry" -name "*.jsonl" -exec sed -i '' "s|$OLD_ABS|$NEW_ABS_FUTURE|g" {} \;
+        SESSION_UPDATED=$((SESSION_UPDATED + 1))
+    fi
+done < <(claude_entries_for_prefix "projects" "$NEW_ENCODED")
+
+if [ $SESSION_UPDATED -gt 0 ]; then
+    echo "Updating session file references..."
+    echo "✓ Updated session files in $SESSION_UPDATED project(s)"
+    echo ""
+fi
+
+# Move the actual directory AFTER Claude context is moved
+echo "Moving directory:"
+echo "  $OLD_ABS"
+echo "  → $NEW_DIR"
+if $DIR_MERGE; then
+    # Target exists with different content — move all items from old into new
+    find "$OLD_ABS" -maxdepth 1 -mindepth 1 | while read -r item; do
+        mv "$item" "$NEW_DIR/"
+    done
+    rmdir "$OLD_ABS" 2>/dev/null || rm -rf "$OLD_ABS"
+else
+    # Simple rename (including case-only rename on case-insensitive fs)
+    # macOS requires a temp name to avoid "same file" error on case-only rename
+    TMP_DIR="${OLD_ABS}_claude_mv_tmp_$$"
+    mv "$OLD_ABS" "$TMP_DIR" && mv "$TMP_DIR" "$NEW_DIR"
+fi
+
+# Resolve new directory to absolute path
+NEW_ABS=$(cd "$NEW_DIR" 2>/dev/null && pwd)
+echo "✓ Directory moved"
+echo ""
+
+# Update history.jsonl to reference new path
+HISTORY_FILE="$CLAUDE_DIR/history.jsonl"
+if [ -f "$HISTORY_FILE" ]; then
+    echo ""
+    echo "Updating history.jsonl references..."
+    cp "$HISTORY_FILE" "$HISTORY_FILE.backup"
+    sed -i '' "s|$OLD_ABS|$NEW_ABS|g" "$HISTORY_FILE"
+    echo "✓ Updated history.jsonl (backup: history.jsonl.backup)"
+fi
