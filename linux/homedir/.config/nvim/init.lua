@@ -1,3 +1,6 @@
+-- Yanks/deletes go to the system clipboard (pbcopy on macOS; OSC 52 over ssh)
+vim.o.clipboard = 'unnamedplus'
+
 local map = vim.keymap.set
 local motion_modes = { 'n', 'x', 'o' }
 
