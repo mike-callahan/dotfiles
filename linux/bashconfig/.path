@@ -6,7 +6,7 @@
 # fi
 #
 export PATH=$PATH:/nix/var/nix/profiles/default/bin/
-export PATH=$PATH:/home/michael/.nix-profile/bin
-export PATH="$PATH:/home/michael/.local/bin"
+export PATH=$PATH:$HOME/.nix-profile/bin
+export PATH="$PATH:$HOME/.local/bin"
 export PATH="$PATH:/apps"
 export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
