@@ -35,27 +35,26 @@ safe_copy() {
 
 # download
 # ----------
-# Transfers a file from the remote machine to your local machine ("local-machine")
+# Transfers a file from the remote machine to your local machine
 # using an existing reverse SSH tunnel (assumes reverse tunnel on port 2222).
 #
 # Usage:
-#   download <remote_file_path> [optional_save_path_on_local-machine]
+#   download <remote_file_path> [optional_save_path_on_local_machine]
 #
 # Example:
 #   download /home/remoteuser/logs/output.txt
-#   download ./data.tar.gz /home/michael/backups
+#   download ./data.tar.gz ~/backups
 #
 # Notes:
 # - This runs from the *remote* machine.
 # - Assumes reverse SSH tunnel is already active:
-#     ssh -N -R 2222:localhost:22 michael@remote_ip
-# - Files will be saved to /home/michael by default unless a custom path is provided.
+#     ssh -N -R 2222:localhost:22 ${USER}@remote_ip
 # - SSH key authentication is recommended for seamless use.
 download() {
     local file_path="$1"
-    local save_path="${2:-/home/michael}"
+    local save_path="${2:-$HOME}"
     local tunnel_port=2222
-    local local_machine_user="michael"
+    local local_machine_user="${USER}"
     local local_machine_host="localhost"
 
     # Validate input
