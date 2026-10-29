@@ -29,3 +29,5 @@ alias rcp="rsync -HAXhaxvPS --numeric-ids --stats"
 
 # Use neovim when invoking vim
 alias vim="nvim"
+
+alias claude="claude --model claude-opus-5-5 --effort xhigh"
